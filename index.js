@@ -1,4 +1,4 @@
-var SerialPort = require('serialport').SerialPort;
+var SerialPort = require('serialport');
 var Parsers = require('serialport').parsers;
 var Pdu = require('./pdu');
 var EventEmitter = require('events').EventEmitter;
