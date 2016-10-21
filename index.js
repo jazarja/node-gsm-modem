@@ -559,7 +559,7 @@ Modem.prototype.handleNotification = function (line) {
       }.bind(this));
     }
   } else if (line.substr(0, 5) === '+CUSD') {
-    match = line.match(/\+CUSD:\s*(\d),"?([0-9A-F]+)"?,(\d*)/);
+    match = line.match(/\+CUSD:\s*(\d),"?([A-Za-z0-9\. \/\r\n,\?]+)"?,(\d*)/);
     if (match !== null && match.length === 4) {
       handled = true;
       this.emit('USSD', parseInt(match[1], 10), match[2], parseInt(match[3], 10));
