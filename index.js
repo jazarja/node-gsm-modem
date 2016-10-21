@@ -617,7 +617,7 @@ Modem.prototype.configureModem = function (cb) {
         }.bind(this));
 
         this.getStorages(function (err, storages) {
-          var i, supportOutboxME = false, supportInboxME = false;
+          var i, supportOutboxME = false, supportInboxME = false, parseError = false;
           if (!err) {
             for (i = 0; i < storages.outbox.length; ++i) {
               if (storages.outbox[i] === '"ME"') { supportOutboxME = true; break; }
@@ -625,21 +625,31 @@ Modem.prototype.configureModem = function (cb) {
             for (i = 0; i < storages.inbox.length; ++i) {
               if (storages.inbox[i] === '"ME"') { supportInboxME = true; break; }
             }
+          } else
+          {
+            // getStorage was unable to parse Wavecomm storage list
+            parseError = true;
           }
-          this.setInboxOutboxStorage(supportInboxME ? "ME" : "SM", supportOutboxME ? "ME" : "SM", function (err) {
-            if (!err) {
-              this.getCurrentMessageStorages(function (err, storages) {
-                this.storages = storages;
-                if(typeof cb === 'function') {
-                  cb();
-                }
-                this.emit('connected');
-              }.bind(this));
-            } else {
-              this.logger.debug('Waiting for modem to be ready...');
-              setTimeout(this.configureModem.bind(this, cb), 1000);
-            }
-          }.bind(this));
+
+          if (!parseError) {
+            this.setInboxOutboxStorage(supportInboxME ? "ME" : "SM", supportOutboxME ? "ME" : "SM", function (err) {
+              if (!err) {
+                this.getCurrentMessageStorages(function (err, storages) {
+                  this.storages = storages;
+                  if (typeof cb === 'function') {
+                    cb();
+                  }
+                  this.emit('connected');
+                }.bind(this));
+              } else {
+                  this.logger.debug('Waiting for modem to be ready...');
+                  setTimeout(this.configureModem.bind(this, cb), 1000);
+              }
+            }.bind(this));
+          } else
+          {
+            cb();
+          }
         }.bind(this));
     }
   }.bind(this, cb));
