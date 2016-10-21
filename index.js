@@ -1087,8 +1087,10 @@ Modem.prototype.getUSSD = function (ussd, cb) {
         var text = '';
         if (encoding === '16bit') {
           text = Pdu.decode16Bit(data);
+          if (text=="") text=data;
         } else if (encoding === '7bit') {
           text = Pdu.decode7Bit(data);
+          if (text=="") text=data;
         } else {
           cb(new Error('Unknown encoding'));
           return;
