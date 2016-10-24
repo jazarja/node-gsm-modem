@@ -403,7 +403,7 @@ Modem.prototype.onData = function (port, bufInd, data) {
     var resp = tempBuffer+buffer.slice(0, this.bufferCursors[bufInd]).toString().trim();
 
     // Make sure command is complete
-    if (resp.indexOf('\r\n')>-1 || resp.indexOf("OK")==0 || resp.indexOf("ERROR")==0 || resp.indexOf(">")==0) {
+    if (resp.indexOf('\r\n')>-1 || resp.indexOf("OK")==0 || resp.indexOf("ERROR")==0 || resp.indexOf(">")==0 || resp.indexOf("+CMS ERROR")==0) {
         tempBuffer = "";
         var arr = resp.split('\r\n');
 
