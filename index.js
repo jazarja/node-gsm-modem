@@ -368,6 +368,9 @@ Modem.prototype.__writeToSerial = function (cmd) {
     }
   }.bind(this));
 };
+
+var tempBuffer = "";
+
 /**
  *
  */
@@ -384,56 +387,81 @@ Modem.prototype.onData = function (port, bufInd, data) {
   if (buffer[this.bufferCursors[bufInd] - 1] !== 10 && data.toString().indexOf('>') === -1) { return; }
   var resp = buffer.slice(0, this.bufferCursors[bufInd]).toString().trim();
   var arr = resp.split('\r\n');
-
-  if (arr.length > 0) {
-    var i, arrLength = arr.length, hadNotification = false;
-    for (i = arrLength - 1; i >= 0; --i) {
-      if (this.handleNotification(arr[i])) {
-        arr.splice(i, 1);
-        --arrLength;
-        hadNotification = true;
-      }
-    }
-    if (hadNotification) {
-      if (arrLength > 0) {
-        var b = new Buffer(arr.join('\r\n'));
-        b.copy(buffer, 0);
-        this.bufferCursors[bufInd] = b.length;
-      } else {
+Modem.prototype.onData = function (port, bufInd, data) {
+    "use strict";
+    var buffer = this.buffers[bufInd];
+    this.logger.debug('%s <----', port.path, data.toString());
+    if (this.bufferCursors[bufInd] + data.length > buffer.length) { //Buffer overflow
+        this.logger.error('Data buffer overflow');
         this.bufferCursors[bufInd] = 0;
+    }
+    data.copy(buffer, this.bufferCursors[bufInd]);
+    this.bufferCursors[bufInd] += data.length;
+    if (buffer[this.bufferCursors[bufInd] - 1] !== 10 && data.toString().indexOf('>') === -1) {
         return;
-      }
     }
-    var lastLine = (arr[arrLength - 1]).trim();
+    var resp = tempBuffer+buffer.slice(0, this.bufferCursors[bufInd]).toString().trim();
 
-    if (port === this.dataPort && this.commandsStack.length > 0) {
-      var cmd = this.commandsStack[0];
-      var b_Finished = false;
+    // Make sure command is complete
+    if (resp.indexOf('\r\n')>-1 || resp.indexOf("OK")==0 || resp.indexOf("ERROR")==0 || resp.indexOf(">")==0) {
+        tempBuffer = "";
+        var arr = resp.split('\r\n');
 
-      if (-1 !== lastLine.indexOf('ERROR') || -1 !== lastLine.indexOf('NOT SUPPORT')) {
-        b_Finished = true;
-      } else if (cmd.waitCommand !== null) {
-        if (-1 !== resp.indexOf(cmd.waitCommand)) {
-          b_Finished = true;
+        if (arr.length > 0) {
+            var i, arrLength = arr.length, hadNotification = false;
+            for (i = arrLength - 1; i >= 0; --i) {
+                if (this.handleNotification(arr[i])) {
+                    arr.splice(i, 1);
+                    --arrLength;
+                    hadNotification = true;
+                }
+            }
+            if (hadNotification) {
+                if (arrLength > 0) {
+                    var b = new Buffer(arr.join('\r\n'));
+                    b.copy(buffer, 0);
+                    this.bufferCursors[bufInd] = b.length;
+                } else {
+                    this.bufferCursors[bufInd] = 0;
+                    return;
+                }
+            }
+            var lastLine = (arr[arrLength - 1]).trim();
+
+            if (port === this.dataPort && this.commandsStack.length > 0) {
+                var cmd = this.commandsStack[0];
+                var b_Finished = false;
+
+                if (-1 !== lastLine.indexOf('ERROR') || -1 !== lastLine.indexOf('NOT SUPPORT')) {
+                    b_Finished = true;
+                } else if (cmd.waitCommand !== null) {
+                    if (-1 !== resp.indexOf(cmd.waitCommand)) {
+                        b_Finished = true;
+                    }
+                } else if (-1 !== lastLine.indexOf('OK')) {
+                    b_Finished = true;
+                }
+                if (b_Finished) {
+                    this.commandsStack.splice(0, 1);
+                    if (this.echoMode) {
+                        arr.splice(0, 1);
+                    }
+                    cmd.doCallback(resp);
+                    this.bufferCursors[bufInd] = 0;
+                    this.sendNext();
+                }
+            } else {
+                this.logger.debug('Unhandled command: %s', resp);
+                this.bufferCursors[bufInd] = 0;
+            }
         }
-      } else if (-1 !== lastLine.indexOf('OK')) {
-        b_Finished = true;
-      }
-      if (b_Finished) {
-        this.commandsStack.splice(0, 1);
-        if (this.echoMode) {
-          arr.splice(0, 1);
-        }
-        cmd.doCallback(resp);
-        this.bufferCursors[bufInd] = 0;
-        this.sendNext();
-      }
-    } else {
-      this.logger.debug('Unhandled command: %s', resp);
-      this.bufferCursors[bufInd] = 0;
+    } else
+    {
+        tempBuffer += resp;
+        console.log("Buffering [", resp,"]");
     }
-  }
 };
+  
 /**
  * handles notification of rings, messages and USSD
  */
